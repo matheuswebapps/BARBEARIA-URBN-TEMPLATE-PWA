@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BusinessSettings } from '../types';
 
 type InstallEvent = Event & {
@@ -12,17 +12,17 @@ const LS_DISMISS_UNTIL = 'pwa_dismiss_until';
 const isStandalone = () =>
   window.matchMedia?.('(display-mode: standalone)')?.matches || (navigator as any).standalone;
 
-const isDesktop = () => {
-  const w = window.innerWidth;
-  // treat wide screens as desktop to avoid showing the banner
-  return w >= 1024;
-};
+const isDesktop = () => window.innerWidth >= 1024;
 
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+const isAndroid = () => /android/i.test(navigator.userAgent);
 
 const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }) => {
   const [deferred, setDeferred] = useState<InstallEvent | null>(null);
   const [open, setOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const openedOnceRef = useRef(false);
 
   const canShow = useMemo(() => {
     if (isStandalone()) return false;
@@ -33,51 +33,78 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
     if (until && Date.now() < until) return false;
 
     return true;
-  }, [open]);
+  }, []);
 
   useEffect(() => {
     const onBeforeInstall = (e: any) => {
+      // Android native install prompt is available only after this event
       e.preventDefault();
       setDeferred(e as InstallEvent);
-      if (canShow) setOpen(true);
+
+      // open banner when the browser says it's installable
+      if (canShow && !openedOnceRef.current) {
+        openedOnceRef.current = true;
+        setOpen(true);
+      }
     };
 
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    window.addEventListener('beforeinstallprompt', onBeforeInstall as any);
+    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall as any);
+  }, [canShow]);
 
   useEffect(() => {
     const onInstalled = () => {
       localStorage.setItem(LS_INSTALLED, '1');
       setOpen(false);
+      setDeferred(null);
     };
     window.addEventListener('appinstalled', onInstalled);
     return () => window.removeEventListener('appinstalled', onInstalled);
   }, []);
 
-  // For iOS and for Android where beforeinstallprompt may not fire, show a premium tutorial CTA
+  // iOS doesn't fire beforeinstallprompt → show tutorial CTA instead
   useEffect(() => {
     if (!canShow) return;
-    const t = setTimeout(() => setOpen(true), 1200);
+    if (!isIOS()) return;
+
+    const t = setTimeout(() => {
+      if (!openedOnceRef.current) {
+        openedOnceRef.current = true;
+        setOpen(true);
+        setShowTutorial(true);
+      }
+    }, 1200);
+
     return () => clearTimeout(t);
   }, [canShow]);
 
+  // If user refreshed and the event didn't fire yet, DON'T auto-open on Android.
+  // Otherwise you'd show an "Install" button that can't open the native prompt.
   if (!canShow || !open) return null;
 
   const title = settings.name ? `Instalar ${settings.name}` : 'Instalar aplicativo';
 
   const onInstall = async () => {
+    // Android native prompt
     if (deferred) {
-      await deferred.prompt();
       try {
-        await deferred.userChoice;
+        await deferred.prompt();
+        const choice = await deferred.userChoice;
+        if (choice?.outcome === 'dismissed') {
+          // keep banner open but allow user to try again later
+          setShowTutorial(true);
+        }
+      } catch {
+        setShowTutorial(true);
       } finally {
+        // Chrome allows prompt() only once per event
         setDeferred(null);
       }
       return;
     }
-    // If no native prompt, just keep tutorial open (Android/iOS)
+
+    // No native prompt available → show tutorial steps
+    setShowTutorial(true);
   };
 
   const onLater = () => {
@@ -90,6 +117,8 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
     localStorage.setItem(LS_INSTALLED, '1');
     setOpen(false);
   };
+
+  const shouldShowTutorial = showTutorial || !deferred;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[999] p-4">
@@ -109,8 +138,8 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
               Acesso rápido na tela inicial, sem abrir navegador.
             </div>
 
-            {/* Tutorial when native prompt isn't available */}
-            {!deferred && (
+            {/* Tutorial when native prompt isn't available (iOS) or when user dismissed */}
+            {shouldShowTutorial && (
               <div className="mt-4 text-xs text-gray-600 bg-[#F9FAFB] border border-gray-200 rounded-xl p-3">
                 {isIOS() ? (
                   <div>
@@ -139,7 +168,7 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
                 onClick={onInstall}
                 className="flex-1 bg-[#1C1C1C] text-white py-3 font-bold rounded-xl hover:bg-black transition-colors text-sm"
               >
-                Instalar
+                {deferred ? 'Instalar' : (isAndroid() ? 'Como instalar' : 'Instalar')}
               </button>
               <button
                 onClick={onLater}

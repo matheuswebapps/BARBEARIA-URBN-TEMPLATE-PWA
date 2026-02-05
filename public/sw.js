@@ -1,55 +1,75 @@
-// Minimal service worker for PWA installability + basic offline fallback.
-// Keeps behavior safe: prefers network, falls back to cache when offline.
-
+/* Minimal, safe SW for installability + offline fallback */
 const CACHE_NAME = 'urbn-pwa-v1';
 const CORE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/logo.png'
 ];
 
+self.addEventListener('message', (event) => {
+  if (event?.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).catch(() => undefined)
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).catch(() => {})
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      // cleanup old caches
       const keys = await caches.keys();
-      await Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : Promise.resolve())));
+      await Promise.all(keys.map((k) => (k === CACHE_NAME ? Promise.resolve() : caches.delete(k))));
       await self.clients.claim();
     })()
   );
 });
 
+// Network-first for HTML, cache-first for static
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
-  if (event.request.method !== 'GET') return;
+  const req = event.request;
+  const url = new URL(req.url);
 
+  if (req.method !== 'GET') return;
+
+  // Only handle same-origin
+  if (url.origin !== self.location.origin) return;
+
+  // HTML navigations: try network, fallback to cache
+  if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
+    event.respondWith(
+      (async () => {
+        try {
+          const fresh = await fetch(req);
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(req, fresh.clone()).catch(() => {});
+          return fresh;
+        } catch {
+          const cached = await caches.match('/index.html');
+          return cached || Response.error();
+        }
+      })()
+    );
+    return;
+  }
+
+  // Static assets: cache-first then network
   event.respondWith(
     (async () => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
       try {
-        const networkResponse = await fetch(event.request);
-        // Optionally cache same-origin assets
-        const url = new URL(event.request.url);
-        if (url.origin === self.location.origin) {
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(event.request, networkResponse.clone()).catch(() => undefined);
-        }
-        return networkResponse;
-      } catch (err) {
-        const cached = await caches.match(event.request);
-        if (cached) return cached;
-        // SPA fallback when offline
-        const fallback = await caches.match('/');
-        return fallback || Response.error();
+        const fresh = await fetch(req);
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(req, fresh.clone()).catch(() => {});
+        return fresh;
+      } catch {
+        return Response.error();
       }
     })()
   );

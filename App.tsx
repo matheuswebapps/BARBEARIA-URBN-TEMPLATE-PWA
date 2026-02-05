@@ -22,25 +22,45 @@ const App: React.FC = () => {
   // Secret Admin Access State
   const [homeClickCount, setHomeClickCount] = useState(0);
 
-
-  // Register Service Worker early (required for Android install prompt)
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker
-      .register('/sw.js', { scope: '/' })
-      .then((registration) => console.log('SW registered:', registration.scope))
-      .catch((err) => console.log('SW registration failed:', err));
-  }, []);
+    // Register Service Worker (must run once for installability)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js', { scope: '/' })
+        .then((registration) => {
+          console.log('SW registered:', registration.scope);
 
-  useEffect(() => {
+          // Keep SW fresh in production (Netlify deploys)
+          if (registration.update) registration.update().catch(() => {});
+
+          // If a new SW is waiting, activate it immediately
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+
+          registration.addEventListener('updatefound', () => {
+            const sw = registration.installing;
+            if (!sw) return;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'installed' && registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          });
+        })
+        .catch((err) => console.log('SW registration failed:', err));
+    }
+
     const loadSettings = async () => {
       try {
         const fetchedSettings = await dataProvider.getSettings();
         setSettings(fetchedSettings);
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+      }
     };
     loadSettings();
-  }, [currentTab]);
+  }, []);
 
   useEffect(() => {
     if (settings.appIconUrl) {
