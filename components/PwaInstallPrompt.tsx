@@ -23,7 +23,6 @@ const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }) => {
   const [deferred, setDeferred] = useState<InstallEvent | null>(null);
   const [open, setOpen] = useState(false);
-  const [info, setInfo] = useState<string>('');
 
   const canShow = useMemo(() => {
     if (isStandalone()) return false;
@@ -40,7 +39,6 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
     const onBeforeInstall = (e: any) => {
       e.preventDefault();
       setDeferred(e as InstallEvent);
-      setInfo('');
       if (canShow) setOpen(true);
     };
 
@@ -69,32 +67,37 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
 
   const title = settings.name ? `Instalar ${settings.name}` : 'Instalar aplicativo';
 
-  const onInstall = async () => {
-    // If the browser provided the native install prompt, use it.
+    const onInstall = async () => {
+    // Native install prompt (Android/Chrome when available)
     if (deferred) {
       try {
         await deferred.prompt();
-        try {
-          const choice = await deferred.userChoice;
-          if (choice?.outcome === 'accepted') {
-            localStorage.setItem(LS_INSTALLED, '1');
-            setOpen(false);
-          } else {
-            // User dismissed - don't spam
-            localStorage.setItem(LS_DISMISS_UNTIL, String(Date.now() + 12 * 60 * 60 * 1000));
-          }
-        } finally {
-          setDeferred(null);
+        const choice = await deferred.userChoice;
+        if (choice?.outcome === 'accepted') {
+          // Some browsers fire appinstalled later; mark as installed to avoid spam
+          localStorage.setItem(LS_INSTALLED, '1');
+          setOpen(false);
+        } else {
+          // dismissed: hide for a while to avoid annoying the user
+          localStorage.setItem(LS_DISMISS_UNTIL, String(Date.now() + 12 * 60 * 60 * 1000));
+          setOpen(false);
         }
       } catch (e) {
-        // Some Android browsers may block prompt() - fall back to instructions
-        setInfo('Seu navegador não liberou a instalação automática. Use o menu ⋮ e toque em “Instalar app”/“Adicionar à tela inicial”.');
+        // If the browser blocks prompt for any reason, fall back to tutorial mode
+        console.warn('[PWA] install prompt failed, showing tutorial', e);
+      } finally {
+        setDeferred(null);
       }
       return;
     }
 
-    // No native prompt available: show instructions (Android/iOS)
-    setInfo('Use o menu ⋮ do navegador e toque em “Instalar app” ou “Adicionar à tela inicial”.');
+    // No native prompt: keep tutorial visible and provide an explicit hint
+    // (Android/iOS often require using the browser menu)
+    if (isIOS()) {
+      alert('No iPhone/iPad: toque em Compartilhar e depois em "Adicionar à Tela de Início".');
+    } else {
+      alert('No Android: toque no menu ⋮ do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".');
+    }
   };
 
   const onLater = () => {
@@ -125,12 +128,6 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
             <div className="text-xs text-gray-500 mt-1">
               Acesso rápido na tela inicial, sem abrir navegador.
             </div>
-
-            {info && (
-              <div className="mt-3 text-xs text-gray-600 bg-[#F9FAFB] border border-gray-200 rounded-xl p-3">
-                {info}
-              </div>
-            )}
 
             {/* Tutorial when native prompt isn't available */}
             {!deferred && (

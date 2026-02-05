@@ -9,6 +9,7 @@ import CutSuggestions from './components/CutSuggestions';
 import Navigation from './components/Navigation';
 import Admin from './components/Admin';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
+import DynamicManifest from './components/DynamicManifest';
 import FloatingSocialButtons from './components/FloatingSocialButtons';
 import { dataProvider } from './dataProvider';
 import { DEFAULT_SETTINGS } from './constants';
