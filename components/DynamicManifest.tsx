@@ -8,7 +8,7 @@ import { BusinessSettings } from '../types';
 const DynamicManifest: React.FC<{ settings: BusinessSettings }> = ({ settings }) => {
   useEffect(() => {
     try {
-      const icon = (settings.appIconUrl && settings.appIconUrl.trim().length > 0) ? settings.appIconUrl : '/icon-512.png';
+      const icon = settings.appIconUrl || '/logo.png';
       const name = settings.name || 'App';
       const shortName = (settings.name || 'App').slice(0, 12);
 
@@ -16,13 +16,12 @@ const DynamicManifest: React.FC<{ settings: BusinessSettings }> = ({ settings })
         name,
         short_name: shortName,
         start_url: '/',
-        scope: '/',
         display: 'standalone',
         background_color: '#FDFBF7',
         theme_color: '#2C1A1D',
         icons: [
-          { src: icon, sizes: '512x512', type: 'image/png' },
-          { src: icon, sizes: '192x192', type: 'image/png' }
+          { src: icon, sizes: '192x192', type: 'image/png' },
+          { src: icon, sizes: '512x512', type: 'image/png' }
         ]
       };
 
