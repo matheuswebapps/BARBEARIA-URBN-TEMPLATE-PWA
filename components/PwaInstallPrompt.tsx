@@ -67,37 +67,17 @@ const PwaInstallPrompt: React.FC<{ settings: BusinessSettings }> = ({ settings }
 
   const title = settings.name ? `Instalar ${settings.name}` : 'Instalar aplicativo';
 
-    const onInstall = async () => {
-    // Native install prompt (Android/Chrome when available)
+  const onInstall = async () => {
     if (deferred) {
+      await deferred.prompt();
       try {
-        await deferred.prompt();
-        const choice = await deferred.userChoice;
-        if (choice?.outcome === 'accepted') {
-          // Some browsers fire appinstalled later; mark as installed to avoid spam
-          localStorage.setItem(LS_INSTALLED, '1');
-          setOpen(false);
-        } else {
-          // dismissed: hide for a while to avoid annoying the user
-          localStorage.setItem(LS_DISMISS_UNTIL, String(Date.now() + 12 * 60 * 60 * 1000));
-          setOpen(false);
-        }
-      } catch (e) {
-        // If the browser blocks prompt for any reason, fall back to tutorial mode
-        console.warn('[PWA] install prompt failed, showing tutorial', e);
+        await deferred.userChoice;
       } finally {
         setDeferred(null);
       }
       return;
     }
-
-    // No native prompt: keep tutorial visible and provide an explicit hint
-    // (Android/iOS often require using the browser menu)
-    if (isIOS()) {
-      alert('No iPhone/iPad: toque em Compartilhar e depois em "Adicionar à Tela de Início".');
-    } else {
-      alert('No Android: toque no menu ⋮ do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".');
-    }
+    // If no native prompt, just keep tutorial open (Android/iOS)
   };
 
   const onLater = () => {

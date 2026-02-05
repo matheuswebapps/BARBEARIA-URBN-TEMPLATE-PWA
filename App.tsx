@@ -22,17 +22,17 @@ const App: React.FC = () => {
   // Secret Admin Access State
   const [homeClickCount, setHomeClickCount] = useState(0);
 
-  useEffect(() => {
-    // Register Service Worker
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(
-          (registration) => console.log('SW registered: ', registration.scope),
-          (err) => console.log('SW registration failed: ', err)
-        );
-      });
-    }
 
+  // Register Service Worker early (required for Android install prompt)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .then((registration) => console.log('SW registered:', registration.scope))
+      .catch((err) => console.log('SW registration failed:', err));
+  }, []);
+
+  useEffect(() => {
     const loadSettings = async () => {
       try {
         const fetchedSettings = await dataProvider.getSettings();
