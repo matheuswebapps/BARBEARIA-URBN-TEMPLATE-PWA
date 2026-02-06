@@ -28,6 +28,7 @@ const Scheduling: React.FC<SchedulingProps> = ({ settings }) => {
 
   const [childName, setChildName] = useState('');
   const [errors, setErrors] = useState({ clientName: false, childName: false });
+  const [stepError, setStepError] = useState<string>('');
 
   const [appointment, setAppointment] = useState<Appointment>({
     services: [],
@@ -306,7 +307,7 @@ const Scheduling: React.FC<SchedulingProps> = ({ settings }) => {
   // Step Navigation Logic
   const handleNextStep = () => {
     if (step === 1) {
-       if (appointment.services.length === 0) return alert("Selecione um serviço");
+       if (appointment.services.length === 0) { setStepError("Selecione um serviço"); return; }
        // If products enabled, go to step 2 (Products), else skip to 3 (Date)
        if (settings.productsEnabled && availableProducts.length > 0) {
          setStep(2);
@@ -316,11 +317,11 @@ const Scheduling: React.FC<SchedulingProps> = ({ settings }) => {
     } else if (step === 2) {
        setStep(3);
     } else if (step === 3) {
-       if (!appointment.dayType) return alert("Escolha um dia");
-       if (appointment.dayType === DayType.OUTRO && !appointment.specificDate) return alert("Escolha uma data");
+       if (!appointment.dayType) { setStepError("Escolha um dia"); return; }
+       if (appointment.dayType === DayType.OUTRO && !appointment.specificDate) { setStepError("Escolha uma data"); return; }
        setStep(4);
     } else if (step === 4) {
-       if (!appointment.time) return alert("Escolha um horário");
+       if (!appointment.time) { setStepError("Escolha um horário"); return; }
        setStep(5);
     }
   };
@@ -527,8 +528,15 @@ const Scheduling: React.FC<SchedulingProps> = ({ settings }) => {
               </div>
             )}
 
+            {stepError && (
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-bold">
+                {stepError}
+              </div>
+            )}
+
             <button 
-              onClick={handleNextStep}
+              type="button"
+              onClick={() => { setStepError(''); handleNextStep(); }}
               className="urban-btn w-full py-4 mt-6 text-lg"
             >
               Continuar
@@ -625,8 +633,14 @@ const Scheduling: React.FC<SchedulingProps> = ({ settings }) => {
              </div>
 
              <div className="pt-4 flex flex-col gap-3">
+                {stepError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-bold">
+                    {stepError}
+                  </div>
+                )}
                 <button 
-                   onClick={handleNextStep}
+                   type="button"
+                   onClick={() => { setStepError(''); handleNextStep(); }}
                    className="urban-btn w-full py-3"
                 >
                    {appointment.products.length > 0 ? `Continuar (${appointment.products.reduce((a, b) => a + b.quantity, 0)} itens)` : 'Não, continuar sem produtos'}
@@ -645,8 +659,10 @@ const Scheduling: React.FC<SchedulingProps> = ({ settings }) => {
                 <button
                   key={day}
                   onClick={() => {
+                     setStepError('');
                      setAppointment(prev => ({...prev, dayType: day}));
-                     if (day === DayType.HOJE) setAppointment(p => ({...p, specificDate: new Date().toLocaleDateString()}));
+                     if (day === DayType.HOJE) setStepError('');
+                     setAppointment(p => ({...p, specificDate: new Date().toLocaleDateString()}));
                      if (day !== DayType.OUTRO) handleNextStep();
                   }}
                   className="p-5 border-2 border-gray-100 hover:border-[#2F6F5E] rounded-xl text-left font-bold text-lg transition-colors bg-white text-[#1C1C1C]"

@@ -159,7 +159,79 @@ const Admin: React.FC = () => {
   };
 
   // Helper to handle option updates for any item
-  const updateItemOptions = (
+  
+  const createId = (): string => {
+    // crypto.randomUUID is supported in modern browsers; fallback keeps IDs unique enough for admin usage.
+    // We avoid external deps to keep the template portable.
+    // @ts-ignore
+    return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  };
+
+  const addCut = () => {
+    setCuts(prev => ([
+      ...prev,
+      {
+        id: createId(),
+        name: '',
+        technicalName: '',
+        category: 'Geral',
+        imageUrl: '',
+        active: true,
+        options: ['', '', '', ''],
+        isChild: false,
+        storagePath: null
+      }
+    ]));
+  };
+
+  const removeCut = (id: string) => {
+    setCuts(prev => prev.filter(c => c.id !== id));
+  };
+
+  const addProduct = () => {
+    setProducts(prev => ([
+      ...prev,
+      {
+        id: createId(),
+        name: '',
+        description: '',
+        price: 0,
+        imageUrl: '',
+        active: true,
+        options: ['', '', '', ''],
+        notForKids: false,
+        storagePath: null
+      }
+    ]));
+  };
+
+  const removeProduct = (id: string) => {
+    setProducts(prev => prev.filter(p => p.id !== id));
+  };
+
+  const addService = () => {
+    setServices(prev => ([
+      ...prev,
+      {
+        id: createId(),
+        name: '',
+        price: 0,
+        durationMinutes: 0,
+        description: '',
+        icon: '',
+        active: true,
+        options: ['', '', '', ''],
+        isChild: false,
+        notForKids: false
+      }
+    ]));
+  };
+
+  const removeService = (id: string) => {
+    setServices(prev => prev.filter(s => s.id !== id));
+  };
+
+const updateItemOptions = (
     itemIndex: number, 
     optionIndex: number, 
     value: string, 
@@ -375,15 +447,24 @@ const Admin: React.FC = () => {
           {/* CUTS / PORTFOLIO */}
           {activeTab === 'cuts' && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase">Itens ilimitados</span>
+                <button onClick={addCut} className="bg-[#2F6F5E] text-white px-4 py-2 text-xs font-bold rounded-xl shadow hover:bg-[#1A4238] transition-colors">
+                  + Adicionar Corte
+                </button>
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 {cuts.map((cut, idx) => (
                   <div key={cut.id} className="border border-gray-100 p-4 bg-gray-50 rounded-xl">
-                     <div className="flex justify-between mb-2">
+                     <div className="flex justify-between mb-2 items-center">
                         <span className="font-bold text-xs text-gray-400">SLOT #{idx + 1}</span>
-                        <input type="checkbox" checked={cut.active} onChange={e => {
+                        <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => removeCut(cut.id)} className="text-[11px] font-bold text-red-500 hover:text-red-700">Remover</button>
+                          <input type="checkbox" checked={cut.active} onChange={e => {
                              const n = [...cuts]; n[idx].active = e.target.checked; setCuts(n);
                         }} />
                      </div>
+                      </div>
                      <input className="admin-input mb-2 font-bold" placeholder="Nome" value={cut.name} onChange={e => { const n = [...cuts]; n[idx].name = e.target.value; setCuts(n); }} />
                      <input className="admin-input mb-2 text-xs" placeholder="Detalhe" value={cut.technicalName} onChange={e => { const n = [...cuts]; n[idx].technicalName = e.target.value; setCuts(n); }} />
                      <input className="admin-input text-xs mb-3" placeholder="URL Imagem" value={cut.imageUrl} onChange={e => { const n = [...cuts]; n[idx].imageUrl = e.target.value; setCuts(n); }} />
@@ -421,15 +502,24 @@ const Admin: React.FC = () => {
           {/* PRODUCTS (NEW TAB) */}
           {activeTab === 'products' && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase">Itens ilimitados</span>
+                <button onClick={addProduct} className="bg-[#2F6F5E] text-white px-4 py-2 text-xs font-bold rounded-xl shadow hover:bg-[#1A4238] transition-colors">
+                  + Adicionar Produto
+                </button>
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 {products.map((prod, idx) => (
                   <div key={prod.id} className="border border-gray-100 p-4 bg-gray-50 rounded-xl">
-                     <div className="flex justify-between mb-2">
+                     <div className="flex justify-between mb-2 items-center">
                         <span className="font-bold text-xs text-gray-400">SLOT #{idx + 1}</span>
-                        <input type="checkbox" checked={prod.active} onChange={e => {
+                        <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => removeProduct(prod.id)} className="text-[11px] font-bold text-red-500 hover:text-red-700">Remover</button>
+                          <input type="checkbox" checked={prod.active} onChange={e => {
                              const n = [...products]; n[idx].active = e.target.checked; setProducts(n);
                         }} />
                      </div>
+                      </div>
                      <input className="admin-input mb-2 font-bold" placeholder="Nome do Produto" value={prod.name} onChange={e => { const n = [...products]; n[idx].name = e.target.value; setProducts(n); }} />
                      <input className="admin-input mb-2 text-xs" placeholder="Descrição Curta" value={prod.description} onChange={e => { const n = [...products]; n[idx].description = e.target.value; setProducts(n); }} />
                      <div className="flex gap-2 mb-2">
@@ -470,13 +560,21 @@ const Admin: React.FC = () => {
           {/* SERVICES */}
           {activeTab === 'services' && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase">Itens ilimitados</span>
+                <button onClick={addService} className="bg-[#2F6F5E] text-white px-4 py-2 text-xs font-bold rounded-xl shadow hover:bg-[#1A4238] transition-colors">
+                  + Adicionar Serviço
+                </button>
+              </div>
               {services.map((svc, idx) => (
                 <div key={svc.id} className="border border-gray-100 p-4 bg-gray-50 rounded-xl">
+                   <div className="flex justify-between items-center mb-2">
+                     <span className="font-bold text-xs text-gray-400">SLOT #{idx + 1}</span>
+                     <button type="button" onClick={() => removeService(svc.id)} className="text-[11px] font-bold text-red-500 hover:text-red-700">Remover</button>
+                   </div>
                    <div className="flex flex-col md:flex-row gap-4 items-center mb-3">
                      <div className="flex-1 w-full">
-                        <div className="flex justify-between md:hidden mb-2">
-                          <span className="font-bold text-xs text-gray-400">SLOT #{idx + 1}</span>
-                        </div>
+                        
                         <input className="admin-input mb-1 font-bold" placeholder="Nome" value={svc.name} onChange={e => { const n = [...services]; n[idx].name = e.target.value; setServices(n); }} />
                         <input className="admin-input text-xs" placeholder="Desc" value={svc.description} onChange={e => { const n = [...services]; n[idx].description = e.target.value; setServices(n); }} />
                      </div>
