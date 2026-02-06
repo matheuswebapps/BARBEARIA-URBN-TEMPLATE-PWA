@@ -38,18 +38,26 @@ const Admin: React.FC = () => {
     if (isLoggedIn) loadData();
   }, [isLoggedIn]);
 
-  const loadData = async () => {
+  
+const loadData = async () => {
     const [s, serv, c, p] = await Promise.all([
       dataProvider.getSettings(),
       dataProvider.getServices(),
       dataProvider.getCuts(),
       dataProvider.getProducts()
     ]);
+
+    // Pad lists so the admin always shows many editable slots by default (without hard limits).
+    const paddedServices = padList(serv || [], MIN_SERVICES, makeServiceSlot as any);
+    const paddedCuts = padList(c || [], MIN_CUTS, makeCutSlot as any);
+    const paddedProducts = padList(p || [], MIN_PRODUCTS, makeProductSlot as any);
+
     setSettings(s);
-    setServices(serv);
-    setCuts(c);
-    setProducts(p);
+    setServices(paddedServices as any);
+    setCuts(paddedCuts as any);
+    setProducts(paddedProducts as any);
   };
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,6 +174,70 @@ const Admin: React.FC = () => {
     // @ts-ignore
     return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   };
+
+
+// Minimum editable slots (base "quasi-ilimitado" sem depender do cliente clicar em "Adicionar")
+const MIN_PRODUCTS = 20;
+const MIN_SERVICES = 40;
+const MIN_CUTS = 60;
+
+const padList = <T extends { id: string }>(
+  list: T[],
+  min: number,
+  makeSlot: (slotIndex: number) => T
+): T[] => {
+  if (!Array.isArray(list)) return list as any;
+  if (list.length >= min) return list;
+
+  const used = new Set(list.map(i => i.id));
+  const out = [...list];
+  let i = 0;
+  while (out.length < min) {
+    const candidate = makeSlot(i);
+    i++;
+    if (used.has(candidate.id)) continue;
+    used.add(candidate.id);
+    out.push(candidate);
+  }
+  return out;
+};
+
+const makeCutSlot = (slotIndex: number) => ({
+  id: `slot-cut-${String(slotIndex + 1).padStart(3, '0')}`,
+  name: '',
+  technicalName: '',
+  category: 'Geral' as const,
+  imageUrl: '',
+  active: false,
+  options: ['', '', '', ''],
+  isChild: false,
+  storagePath: null
+});
+
+const makeProductSlot = (slotIndex: number) => ({
+  id: `slot-prod-${String(slotIndex + 1).padStart(3, '0')}`,
+  name: '',
+  description: '',
+  price: 0,
+  imageUrl: '',
+  active: false,
+  options: [''],
+  notForKids: false,
+  storagePath: null
+});
+
+const makeServiceSlot = (slotIndex: number) => ({
+  id: `slot-serv-${String(slotIndex + 1).padStart(3, '0')}`,
+  name: '',
+  price: 0,
+  durationMinutes: 30,
+  description: '',
+  icon: 'hair',
+  active: false,
+  options: [''],
+  isChild: false,
+  notForKids: false
+});
 
   const addCut = () => {
     setCuts(prev => ([
